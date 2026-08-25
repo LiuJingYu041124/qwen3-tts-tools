@@ -1,0 +1,58 @@
+# macOS and editors
+.DS_Store
+.idea/
+.vscode/
+
+# Python caches and local environments
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+env/
+
+# Credentials and local configuration
+.env
+.env.*
+!.env.example
+*_key.txt
+*_key.txt.*
+*.pem
+*.key
+
+# Runtime projects, logs, and temporary output
+projects/
+.forest_foreign_parts/
+uploads/
+tmp/
+*.log
+*.bak
+*.raw
+
+# Generated media and source documents
+*.mp3
+*.wav
+*.m4a
+*.aac
+*.flac
+*.mp4
+*.mov
+*.mkv
+*.webm
+*.avi
+*.srt
+*.ass
+*.vtt
+*.docx
+
+# Local model weights
+*.bin
+*.safetensors
+*.ckpt
+*.onnx
+*.pt
+*.pth
