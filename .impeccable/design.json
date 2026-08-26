@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-26T12:05:00+08:00",
+  "title": "Design System: 声场",
+  "extensions": {
+    "colorMeta": {
+      "bench-black": {"role": "neutral", "displayName": "剪辑台黑", "canonical": "#090d14", "tonalRamp": ["#05070b", "#090d14", "#111923", "#253142", "#4a596c", "#778596", "#adb7c2", "#eef1f4"]},
+      "studio-ink": {"role": "neutral", "displayName": "暗室靛墨", "canonical": "#0d131d", "tonalRamp": ["#070a10", "#0d131d", "#182331", "#2a394c", "#4c5d73", "#76869a", "#abb5c1", "#edf0f3"]},
+      "playhead-amber": {"role": "primary", "displayName": "播放线琥珀", "canonical": "#ffb45c", "tonalRamp": ["#321b05", "#5b340b", "#885018", "#b66f29", "#df913e", "#ffb45c", "#ffd19a", "#fff2df"]},
+      "clone-blue": {"role": "secondary", "displayName": "克隆声纹蓝", "canonical": "#7db7d8", "tonalRamp": ["#0b2434", "#153d54", "#245c77", "#3d7e9d", "#5e9fbd", "#7db7d8", "#afd5e8", "#e7f4fa"]},
+      "paper-white": {"role": "neutral", "displayName": "对白纸白", "canonical": "#f2f4f7", "tonalRamp": ["#16191d", "#30353b", "#525961", "#78808a", "#a1a8b0", "#c7ccd2", "#e2e5e9", "#f2f4f7"]}
+    },
+    "typographyMeta": {
+      "display": {"displayName": "产品命题", "purpose": "欢迎页首屏的单一大标题。"},
+      "title": {"displayName": "项目标题", "purpose": "当前项目名称与工作对象。"},
+      "body": {"displayName": "对白与正文", "purpose": "台词、角色描述、表单和说明。"},
+      "label": {"displayName": "轨道标记", "purpose": "Take、角色模式、时间与状态元数据。"}
+    },
+    "shadows": [
+      {"name": "floating-workbench", "value": "0 18px 46px rgba(0, 0, 0, .32)", "purpose": "对话框、侧面板、欢迎页示意和提示消息。"},
+      {"name": "dialogue-paper", "value": "0 8px 20px rgba(0,0,0,.16)", "purpose": "仅用于欢迎页的纸白声音素材条。"}
+    ],
+    "motion": [
+      {"name": "state-ease", "value": "180ms ease-out", "purpose": "按钮和表面悬停状态。"},
+      {"name": "status-pulse", "value": "1.35s ease-in-out infinite", "purpose": "仅用于正在生成的状态灯。"}
+    ],
+    "breakpoints": [
+      {"name": "compact-desktop", "value": "1180px"},
+      {"name": "stacked-workspace", "value": "900px"},
+      {"name": "mobile", "value": "680px"}
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "创建项目、生成整轨和确认动作。",
+      "html": "<button class=\"ds-primary\">生成整轨</button>",
+      "css": ".ds-primary{border:0;height:38px;padding:0 14px;border-radius:10px;background:#ffb45c;color:#090d14;font:620 14px -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;transition:background-color .18s ease-out,transform .18s ease-out}.ds-primary:hover{background:#ffc778;transform:translateY(-1px)}.ds-primary:focus-visible{outline:2px solid #ffb45c;outline-offset:2px}"
+    },
+    {
+      "name": "Quiet Button",
+      "kind": "button",
+      "refersTo": "button-quiet",
+      "description": "保存、导入和次级操作。",
+      "html": "<button class=\"ds-quiet\">保存</button>",
+      "css": ".ds-quiet{border:0;height:38px;padding:0 14px;border-radius:10px;background:#16202d;color:#f2f4f7;box-shadow:inset 0 0 0 1px rgba(207,221,239,.13);font:620 14px -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif}.ds-quiet:hover{background:#243244}.ds-quiet:focus-visible{outline:2px solid #ffb45c;outline-offset:2px}"
+    },
+    {
+      "name": "Studio Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "角色、设置和克隆参考文本字段。",
+      "html": "<input class=\"ds-input\" value=\"角色名称\">",
+      "css": ".ds-input{width:240px;border:0;border-radius:8px;padding:9px 10px;background:#0d131d;color:#f2f4f7;box-shadow:inset 0 0 0 1px rgba(207,221,239,.13);font:14px -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif}.ds-input:focus-visible{outline:2px solid #ffb45c;outline-offset:2px}"
+    },
+    {
+      "name": "Voice Mode Switch",
+      "kind": "custom",
+      "description": "在场景造声与授权克隆之间切换。",
+      "html": "<div class=\"ds-mode\"><button class=\"active\">场景造声</button><button class=\"clone\">授权克隆</button></div>",
+      "css": ".ds-mode{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;width:300px;border-radius:10px;background:#0d131d}.ds-mode button{border:0;height:36px;border-radius:7px;background:transparent;color:#6f7f92}.ds-mode button.active{background:#243244;color:#f2f4f7}.ds-mode button.clone:focus,.ds-mode button.clone:hover{background:#263a48;color:#f2f4f7}"
+    },
+    {
+      "name": "Dialogue Strip",
+      "kind": "custom",
+      "description": "连续的 Take、角色和对白素材行，是工作台的签名组件。",
+      "html": "<div class=\"ds-strip\"><b>01</b><span>旁白<br><small>场景造声</small></span><p>暮色落下，城市正在等待新的故事。</p></div>",
+      "css": ".ds-strip{display:grid;grid-template-columns:48px 110px 1fr;min-height:84px;width:520px;background:#0d131d;color:#f2f4f7;border-bottom:1px solid rgba(207,221,239,.13);font:14px -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif}.ds-strip>*{display:flex;align-items:center;padding:12px;border-right:1px solid rgba(207,221,239,.13)}.ds-strip b{justify-content:center;font-variant-numeric:tabular-nums}.ds-strip small{color:#6f7f92}.ds-strip p{margin:0;font-size:15px;line-height:1.55}"
+    }
+  ],
+  "narrative": {
+    "northStar": "电影声音剪辑台",
+    "overview": "声场把角色、台词和生成状态呈现为可剪接的声音素材，而不是普通管理后台。暗靛蓝工作面承载长时间操作，暖琥珀播放线只标记当前动作与生成焦点，克隆声线以冷蓝与场景造声区分。",
+    "keyCharacteristics": ["暗色本地工作面", "琥珀播放与主动作", "冷蓝授权克隆", "轨道式高密度布局", "文字与图形共同表达状态"],
+    "rules": [
+      {"name": "The Signal Color Rule", "body": "琥珀和克隆蓝必须绑定功能语义，不能作为随机装饰。", "section": "colors"},
+      {"name": "The Dialogue Leads Rule", "body": "台词正文必须比控件标签和元数据明显更大、更亮。", "section": "typography"},
+      {"name": "The Flat Bench Rule", "body": "编辑工作面默认平坦；只有脱离文档流的浮层获得大阴影。", "section": "elevation"}
+    ],
+    "dos": ["Do 把角色、台词和声音来源放在首屏可操作区域。", "Do 用轨道、标尺、编号和分栏表达专业声音工作流。", "Do 在窄屏把表格重组为纵向台词编辑。"],
+    "donts": ["Don't 将主工作区重构成同尺寸图标卡片网格。", "Don't 混淆授权克隆与虚构造声。", "Don't 为每个静态容器同时使用边框和阴影。"]
+  }
+}

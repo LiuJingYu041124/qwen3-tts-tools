@@ -11,14 +11,17 @@ from pathlib import Path
 MODELS = ['gemini-3.1-flash-tts-preview', 'gemini-2.5-flash-preview-tts', 'gemini-2.5-pro-preview-tts']
 API = 'https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent'
 SR = 24000
-FF = '/opt/homebrew/opt/ffmpeg-full/bin/ffmpeg'
+import os, shutil
+FF = os.environ.get('FFMPEG') or '/opt/homebrew/opt/ffmpeg-full/bin/ffmpeg'
 if not Path(FF).exists():
-    import shutil
     FF = shutil.which('ffmpeg') or 'ffmpeg'
+FFPROBE = os.environ.get('FFPROBE') or str(Path(FF).with_name('ffprobe'))
+if not Path(FFPROBE).exists():
+    FFPROBE = shutil.which('ffprobe') or 'ffprobe'
 
 
 def dur(p):
-    return float(subprocess.check_output(['ffprobe', '-v', 'error', '-show_entries', 'format=duration',
+    return float(subprocess.check_output([FFPROBE, '-v', 'error', '-show_entries', 'format=duration',
                                           '-of', 'default=nw=1:nk=1', str(p)], text=True).strip())
 
 

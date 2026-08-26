@@ -26,6 +26,8 @@ env/
 
 # Runtime projects, logs, and temporary output
 projects/
+.impeccable/review/
+.impeccable/mocks/
 .forest_foreign_parts/
 uploads/
 tmp/
@@ -50,6 +52,7 @@ tmp/
 *.docx
 
 # Local model weights
+models/
 *.bin
 *.safetensors
 *.ckpt
