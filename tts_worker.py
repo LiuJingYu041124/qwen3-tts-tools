@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import argparse
 import gc
-import hashlib
 import json
 import os
 import shutil
@@ -13,7 +12,11 @@ import numpy as np
 from mlx_audio.tts.utils import load_model
 from scipy.io import wavfile
 
-from voice_consistency import anchored_generation_plan
+from voice_consistency import (
+    cue_generation_plan,
+    generate_cue_results,
+    generation_cache_key,
+)
 
 VOICE_DESIGN_MODEL = os.environ.get(
     "QWEN3_TTS_VOICE_DESIGN_MODEL",
@@ -111,21 +114,15 @@ DESIGN_GENERATE = {
 
 def cache_key(cue, voice, language, models):
     mode = voice_mode(voice)
-    anchored = voice.get("anchor_cue_id") is not None
-    payload = {
-        "text": str(cue.get("text") or ""),
-        "emotion": str(cue.get("emotion") or ""),
-        "role": cue.get("role"),
-        "language": language,
-        "mode": mode,
-        "description": voice.get("description") or voice.get("style") or "",
-        "ref_text": voice.get("ref_text") or "",
-        "reference": None if anchored else reference_signature(voice),
-        "model": models[mode],
-        "generate": CLONE_GENERATE if mode == "clone" else DESIGN_GENERATE,
-        "anchor_cue_id": voice.get("anchor_cue_id"),
-    }
-    return hashlib.sha256(json.dumps(payload, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
+    generate_options = CLONE_GENERATE if mode == "clone" else DESIGN_GENERATE
+    return generation_cache_key(
+        cue,
+        voice,
+        language,
+        models[mode],
+        generate_options,
+        reference_signature(voice),
+    )
 
 
 def collect_audio(results):
@@ -141,40 +138,15 @@ def collect_audio(results):
 
 def generate_audio(model, mode, voice, cue, language, seed):
     mx.random.seed(seed)
-    text = str(cue.get("text") or "").strip()
-    emotion = str(cue.get("emotion") or "自然").strip()
-    if not text:
-        raise RuntimeError("台词为空")
-    if mode == "clone":
-        if not voice.get("clone_consent"):
-            raise RuntimeError("声音克隆尚未确认已获授权")
-        ref_value = str(voice.get("ref_audio") or "").strip()
-        ref_audio = Path(ref_value).expanduser() if ref_value else None
-        if not ref_audio or not ref_audio.is_file():
-            raise RuntimeError("克隆参考音频不存在")
-        ref_text = str(voice.get("ref_text") or "").strip() or None
-        return collect_audio(
-            model.generate(
-                text=text,
-                ref_audio=str(ref_audio),
-                ref_text=ref_text,
-                lang_code=language,
-                **CLONE_GENERATE,
-                verbose=False,
-            )
-        )
-    description = str(voice.get("description") or voice.get("style") or "自然真实的声音").strip()
-    instruction = (
-        f"{description} 当前台词的表演要求：{emotion}。"
-        "保持角色音色稳定，严格只说给定台词，不增加解释或其他内容。"
-    )
     return collect_audio(
-        model.generate_voice_design(
-            text=text,
-            instruct=instruction,
-            language=language,
-            **DESIGN_GENERATE,
-            verbose=False,
+        generate_cue_results(
+            model,
+            mode,
+            voice,
+            cue,
+            language,
+            CLONE_GENERATE,
+            DESIGN_GENERATE,
         )
     )
 
@@ -216,10 +188,6 @@ def load_and_generate(model_name, mode, pending, language, models):
     model = load_model(model_name)
     for cue, voice, raw_path, meta_path, fingerprint, item in pending:
         role = cue["role"]
-        if item.get("anchored"):
-            ref = Path(str(voice.get("ref_audio") or "")).expanduser()
-            if not ref.is_file():
-                raise RuntimeError(f"角色“{role}”还没有首句定音样本，无法保持后续台词音色一致")
         audio, sample_rate = generate_audio(
             model,
             mode,
@@ -236,14 +204,12 @@ def load_and_generate(model_name, mode, pending, language, models):
                     "model": models[mode],
                     "mode": mode,
                     "role": role,
-                    "anchored": bool(item.get("anchored")),
-                    "anchor_cue_id": item.get("anchor_cue_id"),
                 },
                 ensure_ascii=False,
                 indent=2,
             )
         )
-        print(f"GENERATED {cue['id']} {role} {mode}{' anchored' if item.get('anchored') else ''}", flush=True)
+        print(f"GENERATED {cue['id']} {role} {mode}", flush=True)
     del model
     gc.collect()
     mx.clear_cache()
@@ -264,9 +230,8 @@ def build_project(args):
     pending = {"design": [], "clone": []}
     cache_hits = set()
     generation_plan = {}
-    dirty_roles = set()
 
-    for item in anchored_generation_plan(cues, voices, raw_dir):
+    for item in cue_generation_plan(cues, voices):
         cue = item["cue"]
         role = cue.get("role")
         if role not in voices:
@@ -283,13 +248,9 @@ def build_project(args):
                 reuse_hit = duration(raw_path) > 0.1
             except Exception:
                 reuse_hit = False
-        if item.get("anchored") and role in dirty_roles:
-            reuse_hit = False
         if reuse_hit:
             cache_hits.add(cue_id)
             continue
-        if not item.get("anchored") and item.get("mode") == "design":
-            dirty_roles.add(role)
         pending[item["mode"]].append((cue, item["voice"], raw_path, meta_path, fingerprint, item))
 
     load_and_generate(models["design"], "design", pending["design"], language, models)
@@ -395,8 +356,6 @@ def build_project(args):
             "duration": fitted_duration,
             "end_error": (start + fitted_duration) - end,
             "voice_mode": mode,
-            "anchored": bool(item.get("anchored")),
-            "anchor_cue_id": item.get("anchor_cue_id"),
             "cache_hit": cue_id in cache_hits,
             "fit_warning": fit_warning if args.timeline_mode == "fixed" else False,
             "comfortable_tempo": comfortable_tempo if args.timeline_mode == "fixed" else None,

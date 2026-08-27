@@ -291,6 +291,88 @@ class DocumentImportTests(unittest.TestCase):
             ("旁白", "第一章：故事开始。"),
         ])
 
+    def test_parse_script_handles_word_line_separators_and_scene_directions(self):
+        from document_import import parse_script
+        items = parse_script(
+            "《森林火灾》整理版文案\u2028\u2028"
+            "小雪：森林着火了！\u2028"
+            "△浓烟扑面，小雪吓得后退。\u2028"
+            "浩宇：别怕，我马上来！"
+        )
+        self.assertEqual([item["role_name"] for item in items], ["旁白", "小雪", "浩宇"])
+        self.assertEqual(items[1]["text"], "森林着火了！")
+        self.assertNotIn("浓烟扑面", "".join(item["text"] for item in items))
+        self.assertIn("浓烟扑面", items[1]["scene_after"])
+        self.assertIn("浓烟扑面", items[2]["scene_before"])
+
+    def test_parse_script_treats_shot_notes_as_context_instead_of_roles(self):
+        from document_import import parse_script
+        items = parse_script(
+            "画面内容：\n"
+            "【关于诡异世界的笔记：不能吃食物了】\n"
+            "转场——\n"
+            "【小黎父亲录音】：小黎，爸爸想你了。"
+        )
+        self.assertEqual([item["role_name"] for item in items], ["小黎父亲录音"])
+        self.assertEqual(items[0]["text"], "小黎，爸爸想你了。")
+        self.assertIn("诡异世界的笔记", items[0]["scene_before"])
+        self.assertIn("转场", items[0]["scene_before"])
+
+    def test_parse_script_splits_inline_scene_from_group_dialogue(self):
+        from document_import import parse_script
+        items = parse_script("△两人一起挥手。合：拜拜——！")
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["role_name"], "两人齐声")
+        self.assertEqual(items[0]["text"], "拜拜——！")
+        self.assertEqual(items[0]["scene_before"], "两人一起挥手。")
+
+    def test_parse_script_marker_before_group_dialogue_does_not_create_fake_scene(self):
+        from document_import import parse_script
+        items = parse_script("△合：快跑！")
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["role_name"], "两人齐声")
+        self.assertEqual(items[0]["text"], "快跑！")
+        self.assertEqual(items[0]["scene_before"], "")
+
+    def test_parse_script_marker_before_regular_role_keeps_dialogue(self):
+        from document_import import parse_script
+        items = parse_script("△小雪：森林着火了！")
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["role_name"], "小雪")
+        self.assertEqual(items[0]["text"], "森林着火了！")
+        self.assertEqual(items[0]["scene_before"], "")
+
+    def test_parse_script_keeps_dialogue_with_parenthesized_stage_direction(self):
+        from document_import import parse_script
+        items = parse_script("△小雪（低声）：门外有人。")
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["role_name"], "小雪")
+        self.assertEqual(items[0]["text"], "门外有人。")
+        self.assertEqual(items[0]["scene_before"], "低声")
+
+    def test_scene_labels_need_a_delimiter_and_do_not_swallow_narration(self):
+        from document_import import parse_script
+        items = parse_script("场景里的雪越来越大。\n书本从架子上掉了下来。\n场景：雪原中央。\n小雪：快走！")
+        self.assertEqual([item["role_name"] for item in items], ["旁白", "小雪"])
+        self.assertIn("场景里的雪越来越大。", items[0]["text"])
+        self.assertIn("书本从架子上掉了下来。", items[0]["text"])
+        self.assertEqual(items[1]["scene_before"], "雪原中央。")
+
+    def test_scene_context_reaches_cue_emotion_direction(self):
+        from document_import import materialize_script, parse_script
+        from script_direction import direct_script
+
+        items = parse_script(
+            "小雪：先别出声。\n"
+            "△怪物在门外徘徊，脚步越来越近。\n"
+            "浩宇：我们从后门走。"
+        )
+        roles, cues = materialize_script(items, voice_templates=core.VOICE_TEMPLATES)
+        _, directed_cues, _ = direct_script(roles, cues, voice_templates=core.VOICE_TEMPLATES)
+        self.assertIn("怪物在门外", directed_cues[0]["scene_after"])
+        self.assertIn("怪物在门外", directed_cues[1]["scene_before"])
+        self.assertTrue(all(any(token in cue["emotion"] for token in ("紧张", "压低", "警惕")) for cue in directed_cues))
+
     def test_materialize_script_splits_long_paragraphs_and_builds_roles(self):
         from document_import import materialize_script
         long_line = "第一句。" + ("很长的说明。" * 80)
@@ -494,11 +576,127 @@ class ScriptDirectionTests(unittest.TestCase):
         self.assertEqual(len(set(voices)), 3)
         self.assertEqual(directed_roles[2]["voice"], "female_warm")
         emotions = [cue["emotion"] for cue in directed_cues]
-        self.assertEqual(len(set(emotions)), 5)
+        self.assertGreaterEqual(len(set(emotions)), 4)
         self.assertTrue(all(emotion != "自然" for emotion in emotions))
         self.assertIn("催促", directed_cues[1]["emotion"])
         self.assertTrue(any(token in directed_cues[3]["emotion"] for token in ("怒", "愤怒")))
+        self.assertIn("催促", directed_cues[4]["emotion"])
         self.assertFalse(meta["refined"])
+
+    def test_obvious_character_gender_is_respected(self):
+        from script_direction import direct_script
+        roles = [
+            {"id": "role1", "name": "小雪", "mode": "design", "voice": "male_adult", "description": "旧声线"},
+            {"id": "role2", "name": "浩宇", "mode": "design", "voice": "female_warm", "description": "旧声线"},
+            {"id": "role3", "name": "小宇", "mode": "design", "voice": "female_warm", "description": "旧声线"},
+            {"id": "role4", "name": "奇奇", "mode": "design", "voice": "male_young", "description": "旧声线"},
+            {"id": "role5", "name": "李娜", "mode": "design", "voice": "male_young", "description": "旧声线"},
+            {"id": "role6", "name": "王军", "mode": "design", "voice": "female_warm", "description": "旧声线"},
+            {"id": "role7", "name": "小红", "mode": "design", "voice": "male_adult", "description": "旧声线"},
+            {"id": "role8", "name": "小敏", "mode": "design", "voice": "male_adult", "description": "旧声线"},
+        ]
+        cues = [
+            {"id": 1, "role": "role1", "text": "我来帮你。"},
+            {"id": 2, "role": "role2", "text": "马上出发。"},
+            {"id": 3, "role": "role3", "text": "别担心。"},
+            {"id": 4, "role": "role4", "text": "森林着火了！"},
+            {"id": 5, "role": "role5", "text": "我来照顾伤员。"},
+            {"id": 6, "role": "role6", "text": "我负责开路。"},
+            {"id": 7, "role": "role7", "text": "我来帮忙。"},
+            {"id": 8, "role": "role8", "text": "大家小心。"},
+        ]
+        directed_roles, _, _ = direct_script(roles, cues, voice_templates=core.VOICE_TEMPLATES)
+        by_name = {role["name"]: role["voice"] for role in directed_roles}
+        female_voices = {"female_warm", "female_brave", "girl_soft", "girl_lively"}
+        male_voices = {"male_adult", "male_young"}
+        self.assertIn(by_name["小雪"], female_voices)
+        self.assertIn(by_name["奇奇"], female_voices)
+        self.assertIn(by_name["李娜"], female_voices)
+        self.assertIn(by_name["小红"], female_voices)
+        self.assertIn(by_name["小敏"], female_voices)
+        self.assertIn(by_name["浩宇"], male_voices)
+        self.assertIn(by_name["小宇"], male_voices)
+        self.assertIn(by_name["王军"], male_voices)
+
+    def test_punctuation_and_scene_context_drive_emotion(self):
+        from script_direction import direct_script
+        roles = [
+            {"id": "role1", "name": "小雪", "mode": "design", "voice": "female_warm", "description": "旧声线"},
+            {"id": "role2", "name": "浩宇", "mode": "design", "voice": "male_adult", "description": "旧声线"},
+        ]
+        cues = [
+            {
+                "id": 1,
+                "role": "role1",
+                "text": "森林着火了！",
+                "scene_after": "浓烟扑面，小雪吓得后退。",
+            },
+            {
+                "id": 2,
+                "role": "role2",
+                "text": "先别出声。",
+                "scene_before": "怪物在门外徘徊，脚步越来越近。",
+            },
+            {"id": 3, "role": "role1", "text": "你真的没事吗？"},
+            {"id": 4, "role": "role2", "text": "呼……他终于走了。"},
+        ]
+        _, directed_cues, _ = direct_script(roles, cues, voice_templates=core.VOICE_TEMPLATES)
+        self.assertTrue(any(token in directed_cues[0]["emotion"] for token in ("惊", "慌", "急")))
+        self.assertTrue(any(token in directed_cues[1]["emotion"] for token in ("紧张", "压低", "警惕", "小心")))
+        self.assertTrue(any(token in directed_cues[2]["emotion"] for token in ("担心", "关切", "疑问", "探询")))
+        self.assertIn("松一口气", directed_cues[3]["emotion"])
+
+    def test_words_containing_relief_substrings_do_not_imply_relief(self):
+        from script_direction import assign_cue_emotions
+        cues = [
+            {"id": 1, "role": "role1", "text": "快呼叫消防员！"},
+            {"id": 2, "role": "role1", "text": "呼啸的风越来越大。"},
+            {"id": 3, "role": "role1", "text": "夜色压低了城市的呼吸。"},
+            {"id": 4, "role": "role1", "text": "我还好奇他去了哪里。"},
+            {"id": 5, "role": "role1", "text": "这个办法的总算式很复杂。"},
+        ]
+        directed = assign_cue_emotions(cues)
+        self.assertTrue(all("松一口气" not in cue["emotion"] for cue in directed))
+
+    def test_current_danger_dialogue_beats_later_safe_scene(self):
+        from script_direction import assign_cue_emotions
+        cue = {
+            "id": 1,
+            "role": "role1",
+            "text": "森林着火了！",
+            "scene_after": "消防车赶到，火焰终于被扑灭。",
+        }
+        emotion = assign_cue_emotions([cue])[0]["emotion"]
+        self.assertTrue(any(token in emotion for token in ("惊慌", "急促", "发紧")))
+
+    def test_model_direction_cannot_flip_an_obvious_character_gender(self):
+        from script_direction import apply_direction
+        roles = [
+            {"id": "role1", "name": "小雪", "mode": "design", "voice": "female_warm", "description": "年轻女声"},
+            {"id": "role2", "name": "浩宇", "mode": "design", "voice": "male_young", "description": "年轻男声"},
+            {"id": "role3", "name": "小女孩", "mode": "design", "voice": "girl_soft", "description": "小女孩声音"},
+            {"id": "role4", "name": "男童", "mode": "design", "voice": "male_young", "description": "小男孩声音"},
+        ]
+        next_roles, _ = apply_direction(
+            roles,
+            [],
+            [
+                {"id": "role1", "voice": "male_adult", "description": "成年男声"},
+                {"id": "role2", "voice": "female_warm", "description": "年轻女声"},
+                {"id": "role3", "voice": "male_adult", "description": "成年男声"},
+                {"id": "role4", "voice": "female_warm", "description": "年轻女声"},
+            ],
+            [],
+        )
+        by_name = {role["name"]: role for role in next_roles}
+        self.assertIn(by_name["小雪"]["voice"], {"female_warm", "female_brave", "girl_soft", "girl_lively"})
+        self.assertIn("女", by_name["小雪"]["description"])
+        self.assertIn(by_name["浩宇"]["voice"], {"male_adult", "male_young"})
+        self.assertIn("男", by_name["浩宇"]["description"])
+        self.assertIn(by_name["小女孩"]["voice"], {"female_warm", "female_brave", "girl_soft", "girl_lively"})
+        self.assertIn("女", by_name["小女孩"]["description"])
+        self.assertIn(by_name["男童"]["voice"], {"male_adult", "male_young"})
+        self.assertIn("男", by_name["男童"]["description"])
 
     def test_clone_roles_keep_uploaded_voice(self):
         from script_direction import apply_direction, direct_script
@@ -561,30 +759,56 @@ class ScriptDirectionTests(unittest.TestCase):
 
 
 class VoiceConsistencyTests(unittest.TestCase):
-    def test_design_role_later_lines_clone_the_first_generated_take(self):
-        from voice_consistency import anchored_generation_plan
+    def test_design_role_every_line_keeps_voice_design_for_per_cue_emotion(self):
+        from voice_consistency import cue_generation_plan
         cues = [
-            {"id": 1, "role": "role1", "text": "这是定音的第一句。", "enabled": True},
-            {"id": 2, "role": "role1", "text": "后面这句必须是同一个人。", "enabled": True},
-            {"id": 3, "role": "role2", "text": "另一角色仍走造声。", "enabled": True},
+            {"id": 1, "role": "role1", "text": "这是平静的第一句。", "emotion": "平静", "enabled": True},
+            {"id": 2, "role": "role1", "text": "后面突然着火了！", "emotion": "惊慌", "enabled": True},
+            {"id": 3, "role": "role2", "text": "另一角色仍走造声。", "emotion": "坚定", "enabled": True},
         ]
         voices = {
             "role1": {"id": "role1", "mode": "design", "description": "沉稳男声"},
             "role2": {"id": "role2", "mode": "design", "description": "年轻女声"},
         }
-        plan = anchored_generation_plan(cues, voices, raw_dir="/tmp/raw")
-        self.assertEqual(plan[0]["mode"], "design")
-        self.assertFalse(plan[0]["anchored"])
-        self.assertEqual(plan[1]["mode"], "clone")
-        self.assertTrue(plan[1]["anchored"])
-        self.assertEqual(plan[1]["voice"]["ref_audio"], "/tmp/raw/001-role1.wav")
-        self.assertEqual(plan[1]["voice"]["ref_text"], "这是定音的第一句。")
-        self.assertTrue(plan[1]["voice"]["clone_consent"])
-        self.assertEqual(plan[2]["mode"], "design")
-        self.assertFalse(plan[2]["anchored"])
+        plan = cue_generation_plan(cues, voices)
+        self.assertTrue(all(item["mode"] == "design" for item in plan))
+        self.assertEqual(plan[1]["cue"]["emotion"], "惊慌")
+        self.assertNotIn("ref_audio", plan[1]["voice"])
+
+    def test_voice_design_generation_passes_each_cue_emotion_to_model(self):
+        from voice_consistency import generate_cue_results
+
+        class FakeModel:
+            def __init__(self):
+                self.calls = []
+
+            def generate_voice_design(self, **kwargs):
+                self.calls.append(kwargs)
+                result = type("Result", (), {"audio": [0.0, 0.1], "sample_rate": 24000})()
+                return [result]
+
+        model = FakeModel()
+        voice = {"mode": "design", "description": "年轻女声，清亮坚定"}
+        first = {"id": 1, "role": "role1", "text": "先别出声。", "emotion": "紧张、压低声音、保持警惕"}
+        second = {"id": 2, "role": "role1", "text": "我们成功了！", "emotion": "兴奋、带着惊喜和笑意"}
+        generate_cue_results(model, "design", voice, first, "Chinese", {}, {})
+        generate_cue_results(model, "design", voice, second, "Chinese", {}, {})
+        self.assertEqual(len(model.calls), 2)
+        self.assertIn(first["emotion"], model.calls[0]["instruct"])
+        self.assertIn(second["emotion"], model.calls[1]["instruct"])
+        self.assertNotEqual(model.calls[0]["instruct"], model.calls[1]["instruct"])
+
+    def test_voice_design_cache_key_changes_with_cue_emotion(self):
+        from voice_consistency import generation_cache_key
+        voice = {"mode": "design", "description": "年轻女声，清亮坚定"}
+        first = {"id": 1, "role": "role1", "text": "原来是你。", "emotion": "惊恐、急促"}
+        second = {**first, "emotion": "松一口气、声音缓下来"}
+        first_key = generation_cache_key(first, voice, "Chinese", "design-model", {"temperature": 0.7})
+        second_key = generation_cache_key(second, voice, "Chinese", "design-model", {"temperature": 0.7})
+        self.assertNotEqual(first_key, second_key)
 
     def test_authorized_clone_roles_keep_uploaded_reference(self):
-        from voice_consistency import anchored_generation_plan
+        from voice_consistency import cue_generation_plan
         cues = [
             {"id": 1, "role": "role1", "text": "第一句", "enabled": True},
             {"id": 2, "role": "role1", "text": "第二句", "enabled": True},
@@ -595,37 +819,70 @@ class VoiceConsistencyTests(unittest.TestCase):
                 "ref_audio": "/tmp/user.wav", "ref_text": "用户参考",
             }
         }
-        plan = anchored_generation_plan(cues, voices, raw_dir="/tmp/raw")
-        self.assertTrue(all(item["mode"] == "clone" and not item["anchored"] for item in plan))
+        plan = cue_generation_plan(cues, voices)
+        self.assertTrue(all(item["mode"] == "clone" for item in plan))
         self.assertEqual(plan[1]["voice"]["ref_audio"], "/tmp/user.wav")
         self.assertEqual(plan[1]["voice"]["ref_text"], "用户参考")
 
-    def test_disabled_first_cue_is_not_used_as_voice_anchor(self):
-        from voice_consistency import anchored_generation_plan
+    def test_clone_generation_still_uses_authorized_reference(self):
+        from voice_consistency import generate_cue_results
+
+        class FakeModel:
+            def __init__(self):
+                self.calls = []
+
+            def generate(self, **kwargs):
+                self.calls.append(kwargs)
+                return []
+
+            def generate_voice_design(self, **kwargs):
+                raise AssertionError("授权克隆不应调用 VoiceDesign")
+
+        with tempfile.NamedTemporaryFile(suffix=".wav") as reference:
+            model = FakeModel()
+            generate_cue_results(
+                model,
+                "clone",
+                {
+                    "clone_consent": True,
+                    "ref_audio": reference.name,
+                    "ref_text": "准确参考文本",
+                },
+                {"id": 1, "text": "新的台词"},
+                "Chinese",
+                {"temperature": 0.7},
+                {},
+            )
+        self.assertEqual(len(model.calls), 1)
+        self.assertEqual(model.calls[0]["ref_audio"], reference.name)
+        self.assertEqual(model.calls[0]["ref_text"], "准确参考文本")
+        self.assertEqual(model.calls[0]["lang_code"], "Chinese")
+
+    def test_disabled_design_cues_do_not_change_per_line_generation_mode(self):
+        from voice_consistency import cue_generation_plan
         cues = [
             {"id": 1, "role": "role1", "text": "禁用这句", "enabled": False},
-            {"id": 2, "role": "role1", "text": "真正的第一句", "enabled": True},
-            {"id": 3, "role": "role1", "text": "后续克隆", "enabled": True},
+            {"id": 2, "role": "role1", "text": "真正的第一句", "emotion": "平静", "enabled": True},
+            {"id": 3, "role": "role1", "text": "后续惊呼", "emotion": "惊讶", "enabled": True},
         ]
         voices = {"role1": {"id": "role1", "mode": "design", "description": "男声"}}
-        plan = anchored_generation_plan(cues, voices, raw_dir="/tmp/raw")
-        self.assertEqual(plan[1]["mode"], "design")
-        self.assertEqual(plan[2]["voice"]["ref_text"], "真正的第一句")
-        self.assertEqual(plan[2]["voice"]["ref_audio"], "/tmp/raw/002-role1.wav")
+        plan = cue_generation_plan(cues, voices)
+        self.assertTrue(all(item["mode"] == "design" for item in plan))
+        self.assertEqual(plan[2]["cue"]["emotion"], "惊讶")
 
-    def test_first_line_changes_invalidate_later_clone_cache_identity(self):
-        from voice_consistency import anchored_generation_plan
+    def test_design_line_cache_identity_depends_on_its_own_emotion_not_first_line(self):
+        from voice_consistency import cue_generation_plan
         voices = {"role1": {"id": "role1", "mode": "design", "description": "男声"}}
-        first = anchored_generation_plan([
+        first = cue_generation_plan([
             {"id": 1, "role": "role1", "text": "旧的第一句", "enabled": True},
-            {"id": 2, "role": "role1", "text": "后续台词", "enabled": True},
-        ], voices, raw_dir="/tmp/raw")
-        changed = anchored_generation_plan([
+            {"id": 2, "role": "role1", "text": "后续台词", "emotion": "紧张", "enabled": True},
+        ], voices)
+        changed = cue_generation_plan([
             {"id": 1, "role": "role1", "text": "新的第一句", "enabled": True},
-            {"id": 2, "role": "role1", "text": "后续台词", "enabled": True},
-        ], voices, raw_dir="/tmp/raw")
-        self.assertNotEqual(first[1]["voice"]["ref_text"], changed[1]["voice"]["ref_text"])
-        self.assertEqual(changed[1]["voice"]["ref_text"], "新的第一句")
+            {"id": 2, "role": "role1", "text": "后续台词", "emotion": "紧张", "enabled": True},
+        ], voices)
+        self.assertEqual(first[1]["voice"], changed[1]["voice"])
+        self.assertEqual(changed[1]["cue"]["emotion"], "紧张")
 
 
 if __name__ == "__main__":

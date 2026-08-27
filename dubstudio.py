@@ -5,8 +5,6 @@ from pathlib import Path
 
 from document_import import DocumentError, extract_document, materialize_script, parse_script
 from script_direction import apply_direction, direct_script, locked_roles, ollama_direct_script
-from voice_consistency import anchor_path, anchored_voice, first_enabled_cue_by_role
-
 APP_DIR = Path(__file__).resolve().parent
 PROJECTS_DIR = APP_DIR / "projects"
 DEFAULT_WHISPER = Path(os.environ.get("WHISPER_MODEL", APP_DIR / "models" / "ggml-small.bin")).expanduser()
@@ -811,6 +809,8 @@ def normalize_project(p):
         c["id"]=i
         c["enabled"]=bool(c.get("enabled",True)); c["text"]=str(c.get("text","")).strip()
         c["source_text"]=str(c.get("source_text","")).strip(); c["emotion"]=str(c.get("emotion","自然")).strip()
+        c["scene_before"]=str(c.get("scene_before","")).strip()
+        c["scene_after"]=str(c.get("scene_after","")).strip()
         c["speed"]=max(.5,min(2.0,float(c.get("speed",1.0) or 1.0)))
         c["gap_after"]=max(0.0,min(10.0,float(c.get("gap_after",settings.get("default_gap",.25)) or 0)))
         if c.get("role") not in role_ids and role_ids: c["role"]=next(iter(role_ids))
@@ -910,12 +910,7 @@ def generate_tts(pid, reuse=True):
         modes=set()
         for role in p["roles"]:
             if role["id"] not in used_roles: continue
-            if role.get("mode")=="clone":
-                modes.add("克隆")
-            elif sum(1 for cue in cues if cue["role"]==role["id"]) > 1:
-                modes.update({"造声", "定音克隆"})
-            else:
-                modes.add("造声")
+            modes.add("克隆" if role.get("mode")=="clone" else "逐句情绪造声")
         set_stage(pid,"tts","running",f"正在用本地 Qwen3-TTS BF16 生成{' + '.join(sorted(modes))}配音")
         env=os.environ.copy(); env["HF_HUB_OFFLINE"]="1"; env["FFMPEG"]=ffmpeg_full(); env["FFPROBE"]=media_tool("ffprobe")
         cmd=[
@@ -948,20 +943,6 @@ def preview_voice(pid, role_id, text, emotion="自然"):
     validate_clone_roles(p,{role_id})
     preview_dir=root/"previews"; preview_dir.mkdir(parents=True,exist_ok=True)
     preview_role=dict(role)
-    first=first_enabled_cue_by_role(enabled_cues(p)).get(role_id)
-    first_raw=anchor_path(root/"raw", first) if first else None
-    if role.get("mode") != "clone" and first and first_raw and first_raw.is_file():
-        clean_first=root/"clean"/f"{int(first['id']):03d}.wav"
-        same_line=str(text).strip()==str(first.get("text") or "").strip()
-        same_emotion=str(emotion or "自然").strip()==str(first.get("emotion") or "自然").strip()
-        if same_line and same_emotion:
-            source=clean_first if clean_first.is_file() else first_raw
-            token=hashlib.sha256(f"anchor-copy:{source}:{source.stat().st_mtime_ns}".encode()).hexdigest()[:16]
-            output=preview_dir/f"{role_id}-{token}.wav"
-            if not output.exists():
-                shutil.copy2(source, output)
-            return output
-        preview_role=anchored_voice(role, first, root/"raw")
     ref_value=str(preview_role.get("ref_audio") or "").strip(); ref_path=Path(ref_value).expanduser() if ref_value else None
     ref_signature={"size":ref_path.stat().st_size,"mtime_ns":ref_path.stat().st_mtime_ns} if ref_path and ref_path.is_file() else None
     signature=json.dumps({"role":preview_role,"reference":ref_signature,"text":text,"emotion":emotion,"lang":p["settings"].get("target_lang","zh")},ensure_ascii=False,sort_keys=True)

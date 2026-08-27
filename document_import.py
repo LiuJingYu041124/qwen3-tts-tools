@@ -18,6 +18,15 @@ OSASCRIPT = Path("/usr/bin/osascript")
 WORD_NS = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 ODT_TEXT_NS = "{urn:oasis:names:tc:opendocument:xmlns:text:1.0}"
 INVALID_ROLE_NAMES = {"注意", "提示", "备注", "说明", "例如", "比如", "注", "http", "https"}
+SCENE_LABELS = {
+    "画面", "画面内容", "场景", "镜头", "转场", "动作", "舞台说明", "音效", "环境音", "字幕", "屏幕文字", "书本",
+}
+ROLE_ALIASES = {"合": "两人齐声", "齐声": "两人齐声", "两人齐声": "两人齐声"}
+SCENE_PREFIX = re.compile(
+    r"^(?P<label>画面(?:内容)?|场景|镜头|转场|动作|舞台说明|音效|环境音|字幕|屏幕文字|书本)"
+    r"(?:\s*(?:[:：]|[—-]+)\s*(?P<detail>.*))?$"
+)
+INLINE_SCENE_END = re.compile(r"[。！？!?；;…]+")
 ROLE_LINE = re.compile(
     r"^(?:【(?P<bracket>[^】]{1,12})】|(?P<name>[^:：\n]{1,12}))\s*[:：]\s*(?P<line>\S.*)$"
 )
@@ -68,32 +77,72 @@ def parse_script(text):
     items = []
     buffer_role = None
     buffer_parts = []
+    pending_scene = []
+    buffer_scene_before = []
 
     def flush():
-        nonlocal buffer_role, buffer_parts
+        nonlocal buffer_role, buffer_parts, buffer_scene_before
         body = join_parts(buffer_parts)
         if body:
-            items.append({"role_name": buffer_role or "旁白", "text": body})
+            items.append({
+                "role_name": buffer_role or "旁白",
+                "text": body,
+                "scene_before": join_parts(buffer_scene_before),
+                "scene_after": "",
+            })
         buffer_role = None
         buffer_parts = []
+        buffer_scene_before = []
+
+    def attach_scene(scene):
+        scene = str(scene or "").strip()
+        if not scene:
+            return
+        if buffer_parts:
+            flush()
+        if items:
+            items[-1]["scene_after"] = join_parts([items[-1].get("scene_after"), scene])
+        pending_scene.append(scene)
 
     for raw_line in normalize_extracted_text(text).split("\n"):
         stripped = raw_line.strip()
         if not stripped:
             flush()
             continue
+        inline = inline_scene_dialogue(stripped)
+        if inline:
+            if inline["scene"]:
+                attach_scene(inline["scene"])
+            else:
+                flush()
+            buffer_role = ROLE_ALIASES.get(inline["name"], inline["name"])
+            buffer_parts = [inline["line"]]
+            buffer_scene_before = list(pending_scene)
+            pending_scene = []
+            continue
+        scene = scene_direction(stripped)
+        if scene is not None:
+            attach_scene(scene)
+            continue
         labeled = labeled_line(stripped)
         matched = match_role_line(stripped)
         if matched:
             flush()
-            buffer_role = matched["name"]
+            buffer_role = ROLE_ALIASES.get(matched["name"], matched["name"])
             buffer_parts = [matched["line"]]
+            buffer_scene_before = list(pending_scene)
+            pending_scene = []
             continue
         if labeled:
             flush()
             buffer_role = None
             buffer_parts = [stripped]
+            buffer_scene_before = list(pending_scene)
+            pending_scene = []
             continue
+        if not buffer_parts:
+            buffer_scene_before = list(pending_scene)
+            pending_scene = []
         buffer_parts.append(stripped)
     flush()
     return items
@@ -124,7 +173,8 @@ def materialize_script(items, default_gap=0.25, voice_templates=None):
                 "ref_audio": "",
                 "ref_text": "",
             })
-        for piece in split_cue_text(item.get("text") or ""):
+        pieces = split_cue_text(item.get("text") or "")
+        for piece_index, piece in enumerate(pieces):
             duration = max(1.6, min(12.0, len(piece) / 4.2))
             cues.append({
                 "id": len(cues) + 1,
@@ -134,6 +184,8 @@ def materialize_script(items, default_gap=0.25, voice_templates=None):
                 "text": piece,
                 "role": role_ids[name],
                 "emotion": "自然",
+                "scene_before": str(item.get("scene_before") or "") if piece_index == 0 else "",
+                "scene_after": str(item.get("scene_after") or "") if piece_index == len(pieces) - 1 else "",
                 "speed": 1.0,
                 "gap_after": float(default_gap),
                 "enabled": True,
@@ -315,6 +367,45 @@ def extract_pdf_pdfkit(path):
     return str(payload.get("text") or ""), int(payload.get("pages") or 0)
 
 
+def inline_scene_dialogue(line):
+    stripped = str(line or "").strip()
+    if not stripped.startswith(("△", "▲", "◇", "◆", "※")):
+        return None
+    content = stripped.lstrip("△▲◇◆※ ").strip()
+    direct = match_role_line(content)
+    if direct:
+        return {"scene": "", **direct}
+    acted = re.match(r"^(?P<name>[^:：（）()\n]{1,12})\s*[（(](?P<action>[^）)]+)[）)]\s*[:：]\s*(?P<line>\S.*)$", content)
+    if acted and looks_like_role_name(acted.group("name")):
+        return {
+            "scene": acted.group("action").strip(),
+            "name": acted.group("name").strip(),
+            "line": acted.group("line").strip(),
+        }
+    for boundary in INLINE_SCENE_END.finditer(content):
+        matched = match_role_line(content[boundary.end():].strip())
+        if matched:
+            scene = content[:boundary.end()].strip()
+            if not scene.strip("。！？!?；;… "):
+                scene = ""
+            return {"scene": scene, **matched}
+    return None
+
+
+def scene_direction(line):
+    stripped = str(line or "").strip()
+    if not stripped:
+        return None
+    if stripped.startswith(("△", "▲", "◇", "◆", "※")):
+        return stripped.lstrip("△▲◇◆※ ").strip()
+    if stripped.startswith("【") and stripped.endswith("】") and not re.search(r"】\s*[:：]", stripped):
+        return stripped[1:-1].strip()
+    match = SCENE_PREFIX.fullmatch(stripped)
+    if match:
+        return str(match.group("detail") or match.group("label") or "").strip()
+    return None
+
+
 def labeled_line(line):
     match = ROLE_LINE.match(line.strip())
     if not match:
@@ -337,7 +428,7 @@ def looks_like_role_name(name):
     name = (name or "").strip()
     if not 1 <= len(name) <= 12:
         return False
-    if name.lower() in {item.lower() for item in INVALID_ROLE_NAMES}:
+    if name.lower() in {item.lower() for item in INVALID_ROLE_NAMES | SCENE_LABELS}:
         return False
     if re.search(r"[。！？、，;；/\\()（）\[\]《》]", name):
         return False
@@ -380,6 +471,7 @@ def join_parts(parts):
 def normalize_extracted_text(text):
     text = str(text or "").replace("\ufeff", "").replace("\u00a0", " ")
     text = text.replace("\r\n", "\n").replace("\r", "\n")
+    text = text.replace("\u2028", "\n").replace("\u2029", "\n")
     text = re.sub(r"[ \t]+\n", "\n", text)
     text = re.sub(r"\n{3,}", "\n\n", text)
     return text.strip()

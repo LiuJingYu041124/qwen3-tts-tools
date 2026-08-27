@@ -503,7 +503,7 @@ function renderRoles() {
 function renderDesignFields(role, index) {
   return `
     <div class="field"><span>快速起稿</span><div class="preset-grid">${Object.entries(localVoiceOptions).map(([key, label]) => `<button class="${role.voice === key ? "active" : ""}" type="button" onclick="applyVoicePreset(${index},'${key}')">${esc(label)}</button>`).join("")}</div></div>
-    <label class="field"><span>人物与场景声音描述</span><textarea onchange="setRole(${index},'description',this.value)">${esc(role.description || "")}</textarea><small class="field-note">可写年龄、音高、质感、性格、场景、口音和表演习惯。生成整轨时，第一条台词会定音，后续台词克隆这条样本，保证是同一个人。</small></label>
+    <label class="field"><span>人物与场景声音描述</span><textarea onchange="setRole(${index},'description',this.value)">${esc(role.description || "")}</textarea><small class="field-note">可写年龄、音高、质感、性格、场景、口音和表演习惯。整轨中的每句都会沿用这份角色描述，并叠加该句的表演情绪实际生成。</small></label>
   `;
 }
 

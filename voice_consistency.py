@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+import hashlib
+import json
 from copy import deepcopy
 from pathlib import Path
 
@@ -8,54 +10,67 @@ def voice_mode(voice):
     return "clone" if mode == "clone" else "design"
 
 
-def first_enabled_cue_by_role(cues):
-    first = {}
-    for cue in cues or []:
-        if cue.get("enabled") is False:
-            continue
-        role = cue.get("role")
-        if role and role not in first:
-            first[role] = cue
-    return first
-
-
-def anchor_path(raw_dir, cue):
-    if raw_dir is None or not cue:
-        return None
-    return Path(raw_dir) / f"{int(cue['id']):03d}-{cue['role']}.wav"
-
-
-def anchored_voice(voice, first_cue, raw_dir):
-    """Keep the designed identity, but clone later lines from the first generated take."""
-    cloned = deepcopy(voice or {})
-    cloned["mode"] = "clone"
-    cloned["clone_consent"] = True
-    cloned["ref_audio"] = str(anchor_path(raw_dir, first_cue) or "")
-    cloned["ref_text"] = str((first_cue or {}).get("text") or "").strip()
-    cloned["anchor_cue_id"] = int(first_cue["id"]) if first_cue and first_cue.get("id") is not None else None
-    return cloned
-
-
-def should_anchor_cue(cue, voice, first_cue):
-    if voice_mode(voice) != "design" or not first_cue:
-        return False
-    return int(cue.get("id") or 0) != int(first_cue.get("id") or 0)
-
-
-def anchored_generation_plan(cues, voices, raw_dir=None):
-    first_by_role = first_enabled_cue_by_role(cues)
-    plan = []
-    for cue in cues or []:
-        voice = deepcopy(voices.get(cue.get("role")) or {})
-        first = first_by_role.get(cue.get("role"))
-        anchored = should_anchor_cue(cue, voice, first)
-        if anchored:
-            voice = anchored_voice(voice, first, raw_dir)
-        plan.append({
+def cue_generation_plan(cues, voices):
+    return [
+        {
             "cue": cue,
-            "voice": voice,
-            "mode": voice_mode(voice),
-            "anchored": anchored,
-            "anchor_cue_id": int(first["id"]) if anchored else None,
-        })
-    return plan
+            "voice": deepcopy(voices.get(cue.get("role")) or {}),
+            "mode": voice_mode(voices.get(cue.get("role")) or {}),
+        }
+        for cue in cues or []
+    ]
+
+
+def generation_cache_key(cue, voice, language, model, generate_options, reference=None):
+    mode = voice_mode(voice)
+    payload = {
+        "text": str(cue.get("text") or ""),
+        "emotion": str(cue.get("emotion") or ""),
+        "role": cue.get("role"),
+        "language": language,
+        "mode": mode,
+        "description": voice.get("description") or voice.get("style") or "",
+        "ref_text": voice.get("ref_text") or "",
+        "reference": reference,
+        "model": model,
+        "generate": generate_options,
+    }
+    return hashlib.sha256(json.dumps(payload, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
+
+
+def voice_design_instruction(voice, cue):
+    description = str(voice.get("description") or voice.get("style") or "自然真实的声音").strip()
+    emotion = str(cue.get("emotion") or "自然").strip()
+    return (
+        f"{description} 当前台词的表演要求：{emotion}。"
+        "保持角色音色稳定，严格只说给定台词，不增加解释或其他内容。"
+    )
+
+
+def generate_cue_results(model, mode, voice, cue, language, clone_options, design_options):
+    text = str(cue.get("text") or "").strip()
+    if not text:
+        raise RuntimeError("台词为空")
+    if mode == "clone":
+        if not voice.get("clone_consent"):
+            raise RuntimeError("声音克隆尚未确认已获授权")
+        ref_value = str(voice.get("ref_audio") or "").strip()
+        ref_audio = Path(ref_value).expanduser() if ref_value else None
+        if not ref_audio or not ref_audio.is_file():
+            raise RuntimeError("克隆参考音频不存在")
+        ref_text = str(voice.get("ref_text") or "").strip() or None
+        return model.generate(
+            text=text,
+            ref_audio=str(ref_audio),
+            ref_text=ref_text,
+            lang_code=language,
+            **clone_options,
+            verbose=False,
+        )
+    return model.generate_voice_design(
+        text=text,
+        instruct=voice_design_instruction(voice, cue),
+        language=language,
+        **design_options,
+        verbose=False,
+    )
