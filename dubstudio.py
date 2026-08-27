@@ -241,12 +241,12 @@ def apply_imported_script(project, source, extracted, roles, cues, original_name
     project["source"] = str(dest)
     project["original_source"] = original_name or src.name
     warning_text = f"；{extracted['warnings'][0]}" if extracted.get("warnings") else ""
-    direction = dict(direction or {"source": "rules", "refined": False})
-    direction["baseline"] = direction_baseline(
+    direction_data: dict[str, object] = dict(direction or {"source": "rules", "refined": False})
+    direction_data["baseline"] = direction_baseline(
         roles,
         cues,
-        direction.get("cue_ids"),
-        direction.get("locked_role_ids"),
+        direction_data.get("cue_ids"),
+        direction_data.get("locked_role_ids"),
     )
     project["script_import"] = {
         "format": extracted["format"],
@@ -254,7 +254,7 @@ def apply_imported_script(project, source, extracted, roles, cues, original_name
         "warnings": extracted["warnings"],
         "cue_count": len(cues),
         "role_count": len(roles),
-        "direction": direction,
+        "direction": direction_data,
     }
     project["pipeline"] = {
         "status": "pending",
