@@ -22,9 +22,9 @@ SCENE_LABELS = {
     "画面", "画面内容", "场景", "镜头", "转场", "动作", "舞台说明", "音效", "环境音", "字幕", "屏幕文字", "书本",
 }
 ROLE_ALIASES = {"合": "两人齐声", "齐声": "两人齐声", "两人齐声": "两人齐声"}
+SCENE_LABEL_PATTERN = "|".join(sorted((re.escape(label) for label in SCENE_LABELS), key=len, reverse=True))
 SCENE_PREFIX = re.compile(
-    r"^(?P<label>画面(?:内容)?|场景|镜头|转场|动作|舞台说明|音效|环境音|字幕|屏幕文字|书本)"
-    r"(?:\s*(?:[:：]|[—-]+)\s*(?P<detail>.*))?$"
+    rf"^(?P<label>{SCENE_LABEL_PATTERN})(?:\s*(?:[:：]|[—-]+)\s*(?P<detail>.*))?$"
 )
 INLINE_SCENE_END = re.compile(r"[。！？!?；;…]+")
 ROLE_LINE = re.compile(
@@ -184,8 +184,8 @@ def materialize_script(items, default_gap=0.25, voice_templates=None):
                 "text": piece,
                 "role": role_ids[name],
                 "emotion": "自然",
-                "scene_before": str(item.get("scene_before") or "") if piece_index == 0 else "",
-                "scene_after": str(item.get("scene_after") or "") if piece_index == len(pieces) - 1 else "",
+                "scene_before": str(item.get("scene_before") or ""),
+                "scene_after": str(item.get("scene_after") or ""),
                 "speed": 1.0,
                 "gap_after": float(default_gap),
                 "enabled": True,

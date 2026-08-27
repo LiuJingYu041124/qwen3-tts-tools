@@ -358,6 +358,12 @@ class DocumentImportTests(unittest.TestCase):
         self.assertIn("书本从架子上掉了下来。", items[0]["text"])
         self.assertEqual(items[1]["scene_before"], "雪原中央。")
 
+    def test_scene_prefix_labels_are_generated_consistently(self):
+        from document_import import SCENE_LABELS, scene_direction
+        for label in SCENE_LABELS:
+            self.assertEqual(scene_direction(label), label)
+            self.assertEqual(scene_direction(f"{label}：测试说明。"), "测试说明。")
+
     def test_scene_context_reaches_cue_emotion_direction(self):
         from document_import import materialize_script, parse_script
         from script_direction import direct_script
@@ -385,6 +391,21 @@ class DocumentImportTests(unittest.TestCase):
         self.assertTrue(all(len(cue["text"]) <= 280 for cue in cues))
         self.assertEqual(cues[0]["role"], "role1")
         self.assertEqual(cues[1]["role"], "role2")
+
+    def test_materialize_script_keeps_scene_context_on_every_split_piece(self):
+        from document_import import materialize_script
+        long_line = "第一句。" + ("很长的说明。" * 80)
+        _, cues = materialize_script([
+            {
+                "role_name": "小雪",
+                "text": long_line,
+                "scene_before": "怪物正在逼近。",
+                "scene_after": "出口终于打开。",
+            }
+        ])
+        self.assertGreater(len(cues), 1)
+        self.assertTrue(all(cue["scene_before"] == "怪物正在逼近。" for cue in cues))
+        self.assertTrue(all(cue["scene_after"] == "出口终于打开。" for cue in cues))
 
     def test_extract_document_reads_txt_and_docx(self):
         from document_import import extract_document
@@ -617,6 +638,13 @@ class ScriptDirectionTests(unittest.TestCase):
         self.assertIn(by_name["浩宇"], male_voices)
         self.assertIn(by_name["小宇"], male_voices)
         self.assertIn(by_name["王军"], male_voices)
+
+    def test_compound_role_labels_do_not_force_gender_from_internal_titles(self):
+        from script_direction import infer_name_gender
+        self.assertIsNone(infer_name_gender("小梅姐夫"))
+        self.assertIsNone(infer_name_gender("王女士助理"))
+        self.assertEqual(infer_name_gender("小雪姐姐"), "female")
+        self.assertEqual(infer_name_gender("浩宇哥哥"), "male")
 
     def test_punctuation_and_scene_context_drive_emotion(self):
         from script_direction import direct_script

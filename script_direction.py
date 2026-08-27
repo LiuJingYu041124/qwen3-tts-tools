@@ -16,6 +16,8 @@ VOICE_LABELS = {
 NARRATOR_NAMES = {"旁白", "解说", "画外音", "narrator", "Narrator"}
 FEMALE_NAME_MARKERS = ("姐", "妹", "姨", "奶", "妈", "母", "小姐", "姑娘", "女王", "公主", "夫人", "女士", "阿姨")
 MALE_NAME_MARKERS = ("哥", "弟", "叔", "伯", "爷", "爸", "父", "先生", "公子", "少侠", "少爷")
+FEMALE_IDENTITY_SUFFIXES = ("姐姐", "妹妹", "阿姨", "奶奶", "妈妈", "母亲", "小姐", "姑娘", "女王", "公主", "夫人", "女士")
+MALE_IDENTITY_SUFFIXES = ("哥哥", "弟弟", "叔叔", "伯伯", "爷爷", "爸爸", "父亲", "先生", "公子", "少侠", "少爷")
 GIRL_NAME_MARKERS = ("小女孩", "女童", "女孩", "萝莉")
 BOY_NAME_MARKERS = ("小男孩", "男童", "男孩")
 FEMALE_GIVEN_NAMES = {
@@ -142,14 +144,16 @@ def infer_voice_key(name, texts, used):
 def infer_name_gender(name, texts=None):
     name = str(name or "").strip()
     blob = f"{name}{' '.join(str(item or '') for item in (texts or [])[:8])}"
-    if name in FEMALE_GIVEN_NAMES or any(marker in name for marker in FEMALE_NAME_MARKERS):
+    if name in FEMALE_GIVEN_NAMES or name.endswith(FEMALE_IDENTITY_SUFFIXES):
         return "female"
-    if name in MALE_GIVEN_NAMES or any(marker in name for marker in MALE_NAME_MARKERS):
+    if name in MALE_GIVEN_NAMES or name.endswith(MALE_IDENTITY_SUFFIXES):
         return "male"
     if any(marker in name for marker in GIRL_NAME_MARKERS) or re.search(r"(女童|女孩)", blob):
         return "female"
     if any(marker in name for marker in BOY_NAME_MARKERS) or re.search(r"(男童|男孩)", blob):
         return "male"
+    if any(marker in name for marker in FEMALE_NAME_MARKERS + MALE_NAME_MARKERS):
+        return None
     given_name = given_name_part(name)
     strong_female = name_char_score(given_name, STRONG_FEMALE_CHARS)
     strong_male = name_char_score(given_name, STRONG_MALE_CHARS)
