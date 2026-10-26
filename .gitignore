@@ -26,6 +26,8 @@ env/
 
 # Runtime projects, logs, and temporary output
 projects/
+diagnostics/
+recent_tts_review.py
 .impeccable/review/
 .impeccable/mocks/
 .forest_foreign_parts/
@@ -33,6 +35,8 @@ uploads/
 tmp/
 *.log
 *.bak
+*.bak_*
+*.bak.*
 *.raw
 
 # Generated media and source documents

@@ -79,6 +79,21 @@ SCENE_EMOTION_RULES = (
 )
 QUESTION = re.compile(r"[？?]$")
 OLLAMA_BATCH = 48
+DIRECTION_BRIEF_MAX_CHARS = 160
+ROLE_PERSONALITY_MAX_CHARS = 500
+EMOTION_MAX_CHARS = 72
+
+
+def normalize_direction_brief(value):
+    return re.sub(r"\s+", " ", str(value or "")).strip()[:DIRECTION_BRIEF_MAX_CHARS]
+
+
+def normalize_role_personality(value):
+    return re.sub(r"\s+", " ", str(value or "")).strip()[:ROLE_PERSONALITY_MAX_CHARS]
+
+
+def normalize_emotion(value):
+    return re.sub(r"\s+", " ", str(value or "")).strip()[:EMOTION_MAX_CHARS]
 
 
 def locked_roles(roles, extra=None):
@@ -93,7 +108,7 @@ def direct_script(roles, cues, voice_templates=None, locked_role_ids=None, cue_i
     locked = locked_roles(roles, locked_role_ids)
     target_ids = set(cue_ids) if cue_ids is not None else None
     directed_roles = assign_role_voices(roles, cues, templates, locked)
-    directed_cues = assign_cue_emotions(cues, target_ids)
+    directed_cues = assign_cue_emotions(cues, target_ids, directed_roles)
     return directed_roles, directed_cues, {
         "source": "rules",
         "refined": False,
@@ -203,10 +218,11 @@ def customize_description(template, name):
     return f"{template} 这是角色「{name}」的专属声线，要和其他角色明显区分，不要播音腔。"
 
 
-def assign_cue_emotions(cues, target_ids=None):
+def assign_cue_emotions(cues, target_ids=None, roles=None):
     last_by_role = {}
     variant_index = {}
     directed = []
+    role_map = {role.get("id"): role for role in roles or [] if role.get("id")}
     for index, cue in enumerate(cues):
         copy = dict(cue)
         if target_ids is not None and copy.get("id") not in target_ids:
@@ -219,10 +235,58 @@ def assign_cue_emotions(cues, target_ids=None):
         role_id = copy.get("role")
         if not (copy.get("scene_before") or copy.get("scene_after")):
             emotion = vary_emotion(role_id, emotion, last_by_role, variant_index)
-        copy["emotion"] = emotion
-        last_by_role[role_id] = emotion
+        copy["emotion"] = normalize_emotion(emotion)
+        last_by_role[role_id] = copy["emotion"]
         directed.append(copy)
-    return directed
+    return apply_personality_rules(role_map, directed, target_ids)
+
+
+def apply_personality_rules(role_map, cues, target_ids=None):
+    if not role_map or not any(normalize_role_personality(role.get("personality")) for role in role_map.values()):
+        return cues
+    result = []
+    for cue in cues:
+        copy = dict(cue)
+        if target_ids is not None and copy.get("id") not in target_ids:
+            result.append(copy)
+            continue
+        role = role_map.get(copy.get("role")) or {}
+        personality = normalize_role_personality(role.get("personality"))
+        if personality:
+            copy["emotion"] = personality_emotion_instruction(personality, copy.get("emotion"))
+        result.append(copy)
+    return result
+
+
+def personality_reaction_direction(personality):
+    value = normalize_role_personality(personality)
+    rules = (
+        (("克制", "冷静", "沉稳", "内敛", "不吼", "不喊", "压低", "压住", "低声", "平稳", "慢热", "寡言", "外冷"),
+         "收住外露，音量偏低，停顿后再落重音"),
+        (("外向", "活泼", "爽朗", "开朗", "直接", "冲动", "热情", "爱笑", "情绪鲜明"),
+         "反应更快更外放，语速稍快，语调与重音更鲜明"),
+        (("温柔", "柔和", "体贴", "善解人意", "心软", "关切"),
+         "放轻音量，语速稍慢，气息柔和并留出停顿"),
+        (("害羞", "胆小", "自卑", "社恐", "犹豫", "谨慎"),
+         "先留短停顿，语气含蓄，情绪不过度外放"),
+        (("果断", "强势", "责任感", "理性", "干练", "坚定", "领导", "判断"),
+         "先判断后表达，句子干脆，重点清楚"),
+    )
+    for markers, direction in rules:
+        if any(marker in value for marker in markers):
+            return direction
+    return "保持一贯的情绪外露程度、节奏和重音"
+
+
+def personality_emotion_instruction(personality, emotion):
+    personality = normalize_role_personality(personality)
+    emotion = normalize_emotion(emotion) or "自然"
+    if not personality or ("按人物性格" in emotion and "不脱离一贯说话方式" in emotion):
+        return emotion
+    suffix = f"；按人物性格{personality_reaction_direction(personality)}，不脱离一贯说话方式"
+    available = max(1, EMOTION_MAX_CHARS - len(suffix))
+    emotion = emotion[:available].rstrip("，、；。 ") or "自然"
+    return normalize_emotion(f"{emotion}{suffix}")
 
 
 def infer_emotion(cue, previous, nxt, index):
@@ -334,12 +398,12 @@ def apply_direction(roles, cues, directed_roles, directed_cues, locked_role_ids=
         if not update:
             next_cues.append(cue)
             continue
-        emotion = str(update.get("emotion") or cue.get("emotion") or "自然").strip() or "自然"
+        emotion = normalize_emotion(update.get("emotion") or cue.get("emotion") or "自然") or "自然"
         next_cues.append({**cue, "emotion": emotion})
     return next_roles, next_cues
 
 
-def ollama_direct_script(roles, cues, model, locked_role_ids=None, cue_ids=None):
+def ollama_direct_script(roles, cues, model, locked_role_ids=None, cue_ids=None, direction_brief=""):
     if not shutil.which("ollama"):
         raise RuntimeError("未安装 Ollama")
     locked = locked_roles(roles, locked_role_ids)
@@ -348,9 +412,18 @@ def ollama_direct_script(roles, cues, model, locked_role_ids=None, cue_ids=None)
         return roles, cues
     directed_roles = []
     directed_cues = []
+    direction_brief = normalize_direction_brief(direction_brief)
     for start in range(0, len(target_ids), OLLAMA_BATCH):
         batch_ids = target_ids[start:start + OLLAMA_BATCH]
-        parsed = _ollama_direction_batch(roles, cues, model, locked, batch_ids, start == 0)
+        parsed = _ollama_direction_batch(
+            roles,
+            cues,
+            model,
+            locked,
+            batch_ids,
+            start == 0,
+            direction_brief,
+        )
         directed_roles.extend(parsed.get("roles") or [])
         directed_cues.extend(parsed.get("cues") or [])
     if not directed_cues:
@@ -358,14 +431,17 @@ def ollama_direct_script(roles, cues, model, locked_role_ids=None, cue_ids=None)
     return apply_direction(roles, cues, directed_roles, directed_cues, locked)
 
 
-def _ollama_direction_batch(roles, cues, model, locked, batch_ids, include_roles):
+def _ollama_direction_batch(roles, cues, model, locked, batch_ids, include_roles, direction_brief=""):
     wanted = set(batch_ids)
+    direction_brief = normalize_direction_brief(direction_brief)
     payload = {
+        "direction_brief": direction_brief,
         "roles": [
             {
                 "id": role["id"],
                 "name": role.get("name") or role["id"],
                 "locked": role["id"] in locked,
+                "personality": normalize_role_personality(role.get("personality")),
             }
             for role in roles
         ],
@@ -399,11 +475,20 @@ def _ollama_direction_batch(roles, cues, model, locked, batch_ids, include_roles
         if include_roles else
         "这一批不要修改角色音色，roles 请输出空数组。"
     )
+    direction_rule = (
+        f"用户指定整部作品的配音方向是“{direction_brief}”。这是一条全局硬约束：角色年龄感、音色、表演强度、节奏和措辞都要符合它；"
+        "例如少儿内容应清楚、亲切、生动但不要幼稚尖叫。不要在返回文本中机械重复该方向。\n"
+        if direction_brief else
+        "用户未指定整部作品的额外配音方向，请只依据正文、角色和场景判断。\n"
+    )
     prompt = (
         "你是广播剧配音导演。不要改写台词，不要改角色名，不要合并或删减条目。\n"
-        f"1. {role_rule}\n"
-        "2. 为每句台词写 emotion：中文表演要求，8-18字，必须结合标点、scene_before、scene_after、previous 和 next。"
-        "火灾、追逐、怪物逼近、哭泣等场景要明确落到惊慌、紧张、悲伤等可表演情绪。"
+        + direction_rule
+        + f"1. {role_rule}\n"
+        "2. 为每句台词写 emotion：中文、可直接执行的表演要求，12-30字，必须结合标点、scene_before、scene_after、previous 和 next。"
+        "角色若提供 personality，先判断此人遇到当前事件会怎样反应，再把稳定性格翻译为音量、语速、停顿、气息、重音或情绪外露程度；"
+        "不要把性格原文复制进 emotion，不要让沉稳者突然吼叫、内向者无故外放，也不要让所有台词都维持同一种情绪。"
+        "火灾、追逐、怪物逼近、哭泣等场景仍要明确落到惊慌、紧张、悲伤等当前情绪，但表达方式必须符合人物一贯反应。"
         "同一角色相邻句可以在场景连续时保持同类情绪，但不要机械地全部写“自然”。\n"
         "只输出 JSON：{\"roles\":[{\"id\",\"voice\",\"description\"}],\"cues\":[{\"id\",\"emotion\"}]}\n"
         "输入：\n" + json.dumps(payload, ensure_ascii=False)

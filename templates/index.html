@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark">
   <title>声场 · 本地配音工作台</title>
-  <link rel="stylesheet" href="/static/style.css?v=studio5">
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/static/style.css?v=studio27">
 </head>
 <body>
   <!--
@@ -42,7 +43,7 @@
 
   <header class="topbar">
     <a class="brand" href="/" aria-label="声场首页">
-      <span class="brand-mark"><svg><use href="#i-wave"/></svg></span>
+      <span class="brand-mark"><svg data-icon="wave"></svg></span>
       <span><strong>声场</strong><small>LOCAL DUB STUDIO</small></span>
     </a>
     <div class="project-crumb" id="projectCrumb">
@@ -50,16 +51,16 @@
     </div>
     <div class="topbar-state">
       <span class="local-state"><i></i>本地模型</span>
-      <button class="icon-button" type="button" onclick="toggleProjectPanel()" aria-label="项目设置"><svg><use href="#i-settings"/></svg></button>
+      <button class="icon-button" type="button" onclick="toggleProjectPanel()" aria-label="项目设置"><svg data-icon="settings"></svg></button>
     </div>
   </header>
 
   <div class="app-shell">
     <aside class="library" aria-label="项目库">
       <div class="library-actions">
-        <button class="button primary wide" type="button" onclick="openCreateDialog()"><svg><use href="#i-plus"/></svg>新建脚本配音</button>
-        <button class="button quiet wide" type="button" onclick="openDocumentDialog()"><svg><use href="#i-upload"/></svg>导入文档脚本</button>
-        <button class="button quiet wide" type="button" onclick="openVideoDialog()"><svg><use href="#i-video"/></svg>导入视频配音</button>
+        <button class="button primary wide" type="button" onclick="openCreateDialog()"><svg data-icon="plus"></svg>新建脚本配音</button>
+        <button class="button quiet wide" type="button" onclick="openDocumentDialog()"><svg data-icon="upload"></svg>导入文档脚本</button>
+        <button class="button quiet wide" type="button" onclick="openVideoDialog()"><svg data-icon="video"></svg>导入视频配音</button>
       </div>
       <div class="library-heading">
         <h2>项目片盘</h2><span id="projectCount">0</span>
@@ -71,7 +72,7 @@
       </div>
       <div id="projects" class="project-list"></div>
       <div class="library-foot">
-        <svg><use href="#i-headphones"/></svg>
+        <svg data-icon="headphones"></svg>
         <span>造声与克隆均在本机完成</span>
       </div>
     </aside>
@@ -82,9 +83,9 @@
           <h1>一份脚本，<br>两种声线来源。</h1>
           <p>为每个角色创造一副全新的声音，或使用获得授权的参考音频克隆声线。逐句试听确认，再生成完整配音音轨。</p>
           <div class="welcome-actions">
-            <button class="button primary large" type="button" onclick="openCreateDialog()"><svg><use href="#i-script"/></svg>从空白脚本开始</button>
-            <button class="button quiet large" type="button" onclick="openDocumentDialog()"><svg><use href="#i-upload"/></svg>导入文档脚本</button>
-            <button class="text-action" type="button" onclick="openVideoDialog()">已有视频？导入并识别对白<svg><use href="#i-down"/></svg></button>
+            <button class="button primary large" type="button" onclick="openCreateDialog()"><svg data-icon="script"></svg>从空白脚本开始</button>
+            <button class="button quiet large" type="button" onclick="openDocumentDialog()"><svg data-icon="upload"></svg>导入文档脚本</button>
+            <button class="text-action" type="button" onclick="openVideoDialog()">已有视频？导入并识别对白<svg data-icon="down"></svg></button>
           </div>
         </div>
         <div class="signal-demo" aria-label="配音流程示意">
@@ -93,7 +94,7 @@
           <div class="demo-track design"><b>旁白 · 场景造声</b><span>夜色压低了城市的呼吸。</span><i></i></div>
           <div class="demo-track clone"><b>角色 A · 授权克隆</b><span>我们必须在天亮前抵达。</span><i></i></div>
           <div class="demo-track design short"><b>角色 B · 场景造声</b><span>走吧。</span><i></i></div>
-          <div class="demo-caption"><span><svg><use href="#i-spark"/></svg>描述人物与场景</span><span><svg><use href="#i-clone"/></svg>上传授权参考音频</span></div>
+          <div class="demo-caption"><span><svg data-icon="spark"></svg>描述人物与场景</span><span><svg data-icon="clone"></svg>上传授权参考音频</span></div>
         </div>
       </section>
 
@@ -103,24 +104,28 @@
             <span id="projectType" class="type-label">脚本配音</span>
             <input id="projectName" class="project-name" aria-label="项目名称" onchange="renameProject(this.value)">
             <span id="projectSource" class="project-source"></span>
+            <label id="projectDirectionField" class="project-direction-field"><span>配音方向</span><input id="projectDirection" maxlength="160" list="directionBriefExamples" placeholder="例如：少儿故事、温暖绘本、悬疑广播剧" aria-label="整部作品的配音方向" onchange="setProjectDirection(this.value)"></label>
           </div>
           <div class="project-actions">
-            <button class="button quiet" type="button" onclick="saveProject()"><svg><use href="#i-save"/></svg>保存</button>
-            <button id="generateButton" class="button primary" type="button" onclick="generateProject()"><svg><use href="#i-wave"/></svg>生成整轨</button>
-            <button id="downloadButton" class="button quiet" type="button" onclick="downloadOutput()" hidden><svg><use href="#i-download"/></svg>导出</button>
+            <button class="button quiet" type="button" onclick="saveProject()"><svg data-icon="save"></svg>保存</button>
+            <button id="generateButton" class="button primary" type="button" onclick="generateProject()"><svg data-icon="wave"></svg>生成整轨</button>
+            <button id="downloadButton" class="button quiet" type="button" onclick="downloadOutput()" hidden><svg data-icon="download"></svg>导出</button>
           </div>
         </div>
 
-        <div class="status-strip" id="statusStrip">
-          <span class="status-indicator" id="statusIndicator"></span>
-          <strong id="statusText">等待编辑</strong>
-          <div class="status-progress"><i id="statusProgress"></i></div>
+        <div class="status-strip" id="statusStrip" role="status" aria-live="polite" aria-atomic="true">
+          <span class="status-indicator" id="statusIndicator" aria-hidden="true"></span>
+          <div class="status-copy">
+            <strong id="statusText">等待编辑</strong>
+            <small id="statusDetail" hidden></small>
+          </div>
+          <div class="status-progress" role="progressbar" aria-label="配音生成进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="statusProgress"></i></div>
           <span id="statusPercent">0%</span>
-          <button id="retryButton" class="status-retry" type="button" onclick="retryAuto()" hidden><svg><use href="#i-refresh"/></svg>从失败处重试</button>
+          <button id="retryButton" class="status-retry" type="button" onclick="retryAuto()" hidden><svg data-icon="refresh"></svg>从失败处重试</button>
         </div>
 
         <div class="transport" id="transport">
-          <button class="transport-play" type="button" onclick="toggleOutputPlayback()" aria-label="播放或暂停输出"><svg><use href="#i-play"/></svg></button>
+          <button class="transport-play" type="button" onclick="toggleOutputPlayback()" aria-label="播放或暂停输出"><svg data-icon="play"></svg></button>
           <div class="transport-time"><b id="transportCurrent">00:00.0</b><span>/</span><span id="transportDuration">00:00.0</span></div>
           <div class="transport-line"><i id="transportFill"></i></div>
           <audio id="outputAudio" preload="metadata"></audio>
@@ -132,23 +137,63 @@
             <div class="bench-head">
               <div><h2>对白剪辑台</h2><p id="scriptSummary">0 条台词</p></div>
               <div class="bench-actions">
-                <button id="benchImportButton" class="button quiet small" type="button" onclick="openDocumentDialog(true)"><svg><use href="#i-upload"/></svg>导入文档</button>
-                <button class="button quiet small" type="button" onclick="addCue()"><svg><use href="#i-plus"/></svg>添加台词</button>
+                <button id="benchImportButton" class="button quiet small" type="button" onclick="openDocumentDialog(true)"><svg data-icon="upload"></svg>导入文档</button>
+                <button class="button quiet small" type="button" onclick="addCue()"><svg data-icon="plus"></svg>添加台词</button>
               </div>
             </div>
+            <div class="cue-toolbar" aria-label="台词查看工具">
+  <div class="batch-operations" style="display: flex; gap: 8px; align-items: center; margin-right: 12px; padding: 8px; background: var(--surface-1); border-radius: 6px; border: 1px solid var(--border); flex-shrink: 0;">
+    <button class="button quiet small" type="button" onclick="toggleSelectAll()" id="selectAllBtn">全选</button>
+    <button class="button quiet small" type="button" onclick="invertCueSelection()" id="invertSelectBtn">反选</button>
+    <button class="button quiet small" type="button" onclick="toggleBatchPanel()" id="batchBtn">批量调整</button>
+    <button id="batchDeleteBtn" type="button" class="button danger-solid small" onclick="deleteSelectedCues()" disabled>删除</button>
+  </div>
+              <div id="cueRoleFilters" class="cue-role-filters" role="group" aria-label="按角色查看台词"></div>
+              <label class="cue-search"><span>查找</span><input id="cueSearch" type="search" placeholder="搜索台词或表演" autocomplete="off" oninput="setCueSearch(this.value)"></label>
+              <button id="clearCueFilters" class="text-action compact" type="button" onclick="clearCueFilters()" hidden>清除筛选</button>
+            </div>
             <div class="timeline-ruler" aria-hidden="true"><span>TAKE</span><span>ROLE</span><span>DIALOGUE / PERFORMANCE</span><span>CONTROL</span></div>
-            <div id="cues" class="cue-list"></div>
+
+  <div id="batchPanel" class="batch-panel" hidden role="dialog" aria-modal="true" aria-labelledby="batchPanelTitle">
+    <h3 id="batchPanelTitle">批量调整语速和间隔</h3>
+    <div style="display: flex; gap: 16px; align-items: center; flex-wrap: wrap;">
+      <label style="display: flex; align-items: center; gap: 6px;">
+        <span>语速:</span>
+        <input type="number" id="batchSpeed" min="0.5" max="2.0" step="0.1" value="1.0" style="width: 70px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 4px;">
+      </label>
+      <label style="display: flex; align-items: center; gap: 6px;">
+        <span>间隔(秒):</span>
+        <input type="number" id="batchGap" min="0" max="10" step="0.1" value="0.25" style="width: 70px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 4px;">
+      </label>
+      <button class="button primary small" type="button" onclick="applyBatchSpeedGap()">应用</button>
+      <button class="button quiet small" type="button" onclick="toggleBatchPanel()">取消</button>
+    </div>
+    <div id="batchStatus" style="margin-top: 8px; font-size: 12px; color: var(--text-2);"></div>
+  </div>
+<div id="trackNotice" class="track-notice" role="status" hidden></div>
+<div id="cues" class="cue-list"></div>
             <div id="emptyCueAction" class="empty-cue-actions" hidden>
-              <button id="emptyImportButton" class="empty-cue-action" type="button" onclick="openDocumentDialog(true)"><svg><use href="#i-upload"/></svg>导入文档脚本</button>
-              <button class="empty-cue-action" type="button" onclick="addCue()"><svg><use href="#i-plus"/></svg>添加第一句台词</button>
+              <button id="emptyImportButton" class="empty-cue-action" type="button" onclick="openDocumentDialog(true)"><svg data-icon="upload"></svg>导入文档脚本</button>
+              <button class="empty-cue-action" type="button" onclick="addCue()"><svg data-icon="plus"></svg>添加第一句台词</button>
             </div>
           </section>
 
           <aside class="voice-rack" aria-label="角色声线架">
             <div class="rack-head">
               <div><h2>角色声线</h2><span id="roleCount">0</span></div>
-              <button class="icon-button" type="button" onclick="addRole()" aria-label="添加角色"><svg><use href="#i-plus"/></svg></button>
+              <button class="icon-button" type="button" onclick="addRole()" aria-label="添加角色"><svg data-icon="plus"></svg></button>
             </div>
+            <section id="importedVoiceGuide" class="imported-voice-guide" aria-labelledby="importedVoiceGuideTitle" hidden>
+              <div class="imported-guide-head">
+                <div><h3 id="importedVoiceGuideTitle">为文稿角色绑定参考配音</h3><p id="importedVoiceGuideSummary"></p></div>
+                <button class="icon-button" type="button" onclick="dismissImportedVoiceGuide()" aria-label="收起参考配音引导"><svg data-icon="close"></svg></button>
+              </div>
+              <div id="importedVoiceGuideRoles" class="imported-guide-roles"></div>
+              <div class="imported-guide-actions">
+                <button id="configureNextImportedRole" class="button quiet small" type="button" onclick="selectNextImportedRole()"><svg data-icon="clone"></svg>配置下一个角色</button>
+                <span>克隆角色需逐个确认授权，并核听参考音频逐字稿。</span>
+              </div>
+            </section>
             <div id="roleTabs" class="role-tabs"></div>
             <div id="roleInspector" class="role-inspector"></div>
           </aside>
@@ -158,50 +203,87 @@
   </div>
 
   <aside id="projectPanel" class="project-panel" hidden aria-label="项目设置">
-    <div class="panel-title"><div><h2>项目设置</h2><p>语言、时间轴与视频混音</p></div><button class="icon-button" type="button" onclick="toggleProjectPanel(false)" aria-label="关闭设置"><svg><use href="#i-close"/></svg></button></div>
+    <div class="panel-title"><div><h2>项目设置</h2><p>语言、时间轴与视频混音</p></div><button class="icon-button" type="button" onclick="toggleProjectPanel(false)" aria-label="关闭设置"><svg data-icon="close"></svg></button></div>
     <div id="settings" class="settings-form"></div>
-    <details class="log-drawer"><summary><svg><use href="#i-log"/></svg>运行日志</summary><pre id="log">尚无日志</pre></details>
+    <details class="log-drawer"><summary><svg data-icon="log"></svg>运行日志</summary><pre id="log">尚无日志</pre></details>
   </aside>
+
+  <dialog id="deleteProjectDialog" class="dialog danger-dialog" aria-labelledby="deleteProjectTitle">
+    <div class="dialog-head"><div><h2 id="deleteProjectTitle">永久删除项目</h2><p>删除后无法恢复</p></div><button class="icon-button" type="button" onclick="closeDeleteProjectDialog()" aria-label="关闭"><svg data-icon="close"></svg></button></div>
+    <div class="delete-project-body">
+      <p>确定删除项目“<strong id="deleteProjectName"></strong>”吗？</p>
+      <div id="deleteProjectState" class="delete-project-warning" role="alert">将永久删除项目、源文件副本、参考音频、候选试听、已采用 Take、缓存和最终输出。此操作无法撤销。</div>
+    </div>
+    <div class="dialog-actions delete-project-actions"><button class="button quiet" type="button" onclick="closeDeleteProjectDialog()">取消</button><button id="confirmDeleteProjectButton" class="button danger-solid" type="button" onclick="confirmDeleteProject()"><svg data-icon="trash"></svg>永久删除</button></div>
+  </dialog>
 
   <dialog id="createDialog" class="dialog">
     <form method="dialog" onsubmit="createVoiceProject(event)">
-      <div class="dialog-head"><div><h2>新建脚本配音</h2><p>导入文稿，或从空白台词开始</p></div><button class="icon-button" type="button" onclick="document.querySelector('#createDialog').close()" aria-label="关闭"><svg><use href="#i-close"/></svg></button></div>
-      <label class="file-drop optional-drop" id="createDocumentDrop" ondragover="onCreateDocumentDrag(event,true)" ondragleave="onCreateDocumentDrag(event,false)" ondrop="onCreateDocumentDrop(event)"><input id="createDocumentFile" type="file" accept=".txt,.md,.docx,.doc,.rtf,.odt,.pdf,text/plain,text/markdown,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,application/rtf,application/vnd.oasis.opendocument.text" onchange="showCreateDocument(this.files[0])"><svg><use href="#i-upload"/></svg><b id="createDocumentName">导入 TXT / Word / PDF</b><span>可选。不选文件则创建空白工作台</span></label>
+      <div class="dialog-head"><div><h2>新建脚本配音</h2><p>导入文稿，或从空白台词开始</p></div><button class="icon-button" type="button" onclick="document.querySelector('#createDialog').close()" aria-label="关闭"><svg data-icon="close"></svg></button></div>
+      <label class="file-drop optional-drop" id="createDocumentDrop" ondragover="onCreateDocumentDrag(event,true)" ondragleave="onCreateDocumentDrag(event,false)" ondrop="onCreateDocumentDrop(event)"><input id="createDocumentFile" type="file" accept=".txt,.md,.docx,.doc,.rtf,.odt,.pdf,text/plain,text/markdown,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,application/rtf,application/vnd.oasis.opendocument.text" onchange="showCreateDocument(this.files[0])"><svg data-icon="upload"></svg><b id="createDocumentName">导入 TXT / Word / PDF</b><span>可选。不选文件则创建空白工作台</span></label>
       <label>项目名称<input id="newProjectName" required value="未命名配音"></label>
       <label>主要语言<select id="newProjectLang"><option value="zh">中文</option><option value="en">英语</option><option value="ja">日语</option><option value="ko">韩语</option></select></label>
-      <div id="createDocumentState" class="form-note">有文稿就拖进来拆成台词；没有文稿就直接创建空白对白台。</div>
-      <div class="dialog-actions"><button class="button quiet" type="button" onclick="document.querySelector('#createDialog').close()">取消</button><button id="createProjectButton" class="button primary" type="submit"><svg><use href="#i-plus"/></svg>创建工作台</button></div>
+      <label>配音方向（可选）<input id="newProjectDirection" maxlength="160" list="directionBriefExamples" placeholder="例如：偏少儿、温暖绘本、沉浸式悬疑"></label>
+      {# Older workers reload templates without reloading document upload handlers. #}
+      {% if document_voice_modes %}
+      <label id="createVoiceModeField" hidden>文稿音色处理<select id="createVoiceMode" aria-describedby="createDocumentState" onchange="updateCreateDocumentOptions()"><option value="design">自动设计音色</option><option value="clone">不生成音色，导入后配置声音克隆</option></select></label>
+      {% endif %}
+      <div id="createDocumentState" class="form-note" role="status">有文稿就拖进来拆成台词；没有文稿也可直接创建空白对白台。</div>
+      <div class="dialog-actions"><button class="button quiet" type="button" onclick="document.querySelector('#createDialog').close()">取消</button><button id="createProjectButton" class="button primary" type="submit"><svg data-icon="plus"></svg>创建工作台</button></div>
     </form>
   </dialog>
 
   <dialog id="documentDialog" class="dialog">
     <form method="dialog" onsubmit="uploadDocument(event)">
-      <div class="dialog-head"><div><h2 id="documentDialogTitle">导入文档脚本</h2><p id="documentDialogHint">按段落拆成台词，再按上下文给每个角色和每句话分配音色与情绪</p></div><button class="icon-button" type="button" onclick="document.querySelector('#documentDialog').close()" aria-label="关闭"><svg><use href="#i-close"/></svg></button></div>
-      <label class="file-drop" id="documentDrop" ondragover="onDocumentDrag(event,true)" ondragleave="onDocumentDrag(event,false)" ondrop="onDocumentDrop(event)"><input id="documentFile" type="file" accept=".txt,.md,.docx,.doc,.rtf,.odt,.pdf,text/plain,text/markdown,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,application/rtf,application/vnd.oasis.opendocument.text" required onchange="showSelectedDocument(this.files[0])"><svg><use href="#i-upload"/></svg><b id="documentFileName">选择或拖入文稿</b><span>TXT、MD、DOCX、DOC、RTF、ODT、PDF · 不超过 12 MB</span></label>
+      <div class="dialog-head"><div><h2 id="documentDialogTitle">导入文档脚本</h2><p id="documentDialogHint">保留原文顺序，识别角色并拆分台词</p></div><button class="icon-button" type="button" onclick="document.querySelector('#documentDialog').close()" aria-label="关闭"><svg data-icon="close"></svg></button></div>
+      <label class="file-drop" id="documentDrop" ondragover="onDocumentDrag(event,true)" ondragleave="onDocumentDrag(event,false)" ondrop="onDocumentDrop(event)"><input id="documentFile" type="file" accept=".txt,.md,.docx,.doc,.rtf,.odt,.pdf,text/plain,text/markdown,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,application/rtf,application/vnd.oasis.opendocument.text" required onchange="showSelectedDocument(this.files[0])"><svg data-icon="upload"></svg><b id="documentFileName">选择或拖入文稿</b><span>TXT、MD、DOCX、DOC、RTF、ODT、PDF · 不超过 12 MB</span></label>
       <label id="documentNameField">项目名称<input id="documentProjectName" placeholder="默认使用文件名"></label>
       <label id="documentLangField">主要语言<select id="documentLang"><option value="zh">中文</option><option value="en">英语</option><option value="ja">日语</option><option value="ko">韩语</option></select></label>
-      <div id="documentUploadState" class="form-note">保留原文顺序。默认归入旁白；明确的“角色：台词”会新建角色。导入后自动分配情绪与音色，不会立刻生成音频。</div>
-      <div class="dialog-actions"><button class="button quiet" type="button" onclick="document.querySelector('#documentDialog').close()">取消</button><button id="documentUploadButton" class="button primary" type="submit"><svg><use href="#i-script"/></svg>导入到对白剪辑台</button></div>
+      <label>配音方向（可选）<input id="documentDirection" maxlength="160" list="directionBriefExamples" placeholder="例如：偏少儿、温暖绘本、悬疑广播剧、纪录片旁白"><small>用一句话说明受众、题材或整体表演感觉；导入后仍可在项目顶部修改。</small></label>
+      {% if document_voice_modes %}
+      <label>音色处理<select id="documentVoiceMode" aria-describedby="documentUploadState" onchange="updateDocumentImportOptions()"><option value="design">自动设计音色</option><option value="clone">不生成音色，导入后配置声音克隆</option></select></label>
+      {% endif %}
+      <div id="documentUploadState" class="form-note" role="status">保留原文顺序。默认归入旁白；明确的“角色：台词”会新建角色。</div>
+      <div class="dialog-actions"><button class="button quiet" type="button" onclick="document.querySelector('#documentDialog').close()">取消</button><button id="documentUploadButton" class="button primary" type="submit"><svg data-icon="script"></svg>导入到对白剪辑台</button></div>
     </form>
   </dialog>
 
   <dialog id="videoDialog" class="dialog">
     <form method="dialog" onsubmit="uploadVideo(event)">
-      <div class="dialog-head"><div><h2>导入视频配音</h2><p>自动识别对白并建立时间轴</p></div><button class="icon-button" type="button" onclick="document.querySelector('#videoDialog').close()" aria-label="关闭"><svg><use href="#i-close"/></svg></button></div>
-      <label class="file-drop"><input id="videoFile" type="file" accept="video/*" required onchange="showSelectedVideo(this.files[0])"><svg><use href="#i-upload"/></svg><b id="videoFileName">选择视频文件</b><span>MP4、MOV、MKV、WebM、M4V、AVI</span></label>
+      <div class="dialog-head"><div><h2>导入视频配音</h2><p>自动识别对白并建立时间轴</p></div><button class="icon-button" type="button" onclick="document.querySelector('#videoDialog').close()" aria-label="关闭"><svg data-icon="close"></svg></button></div>
+      <label class="file-drop"><input id="videoFile" type="file" accept="video/*" required onchange="showSelectedVideo(this.files[0])"><svg data-icon="upload"></svg><b id="videoFileName">选择视频文件</b><span>MP4、MOV、MKV、WebM、M4V、AVI</span></label>
       <label>项目名称<input id="videoProjectName" placeholder="默认使用文件名"></label>
       <label>目标语言<select id="videoLang"><option value="zh">中文</option><option value="en">英语</option><option value="ja">日语</option><option value="ko">韩语</option></select></label>
       <div id="videoUploadState" class="form-note">本地 Whisper 识别，Ollama 分析角色，Qwen3-TTS 生成配音。</div>
-      <div class="dialog-actions"><button class="button quiet" type="button" onclick="document.querySelector('#videoDialog').close()">取消</button><button id="videoUploadButton" class="button primary" type="submit"><svg><use href="#i-video"/></svg>导入并自动处理</button></div>
+      <div class="dialog-actions"><button class="button quiet" type="button" onclick="document.querySelector('#videoDialog').close()">取消</button><button id="videoUploadButton" class="button primary" type="submit"><svg data-icon="video"></svg>导入并自动处理</button></div>
     </form>
   </dialog>
 
   <dialog id="mediaDialog" class="media-dialog">
-    <div class="dialog-head"><div><h2>成片预览</h2><p id="mediaPreviewName"></p></div><button class="icon-button" type="button" onclick="closeMediaDialog()" aria-label="关闭"><svg><use href="#i-close"/></svg></button></div>
+    <div class="dialog-head"><div><h2>成片预览</h2><p id="mediaPreviewName"></p></div><button class="icon-button" type="button" onclick="closeMediaDialog()" aria-label="关闭"><svg data-icon="close"></svg></button></div>
     <video id="videoPreview" controls playsinline></video>
   </dialog>
 
+  <datalist id="directionBriefExamples">
+    <option value="少儿故事：亲切、生动、咬字清楚，情绪鲜明但不过度尖叫"></option>
+    <option value="温暖绘本：柔和、有陪伴感，节奏舒缓"></option>
+    <option value="悬疑广播剧：克制、紧张、电影感，留出停顿"></option>
+    <option value="纪录片旁白：沉稳、可信、清楚，不要播音腔过重"></option>
+    <option value="热血冒险：节奏明快、行动感强，角色差异明显"></option>
+    <option value="治愈情感：自然真诚、细腻克制，避免煽情过度"></option>
+  </datalist>
+
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-  <script src="/static/app.js?v=studio5"></script>
-</body>
+  <script src="/static/app.js?v=studio28"></script>
+<script>
+// 统一处理 SVG 图标
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('svg[data-icon]').forEach(function(svg) {
+    var icon = svg.getAttribute('data-icon');
+    var use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+    use.setAttribute('href', '#i-' + icon);
+    svg.appendChild(use);
+  });
+});
+</script></body>
 </html>
